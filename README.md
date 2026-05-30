@@ -135,4 +135,4 @@ frame150.ps1 -InputVideo "Video.mp4" -OutputDir "Video_frames" -Rebuild
 - **フレーム補完**：`fps` が割り切れない場合、`blend`（隣接ブレンド）/ `minterpolate`（動き推定）で中間フレームを生成できます。`minterpolate` は高品質ですが低速です。
 - **形式の選び方**：写真系の動画は WebP が小さく高品質。完全無劣化が必要なら PNG。互換性重視なら JPG。
 - **PNG減色**：pngquant があれば高品質に減色、無ければ ffmpeg のパレット減色で代替します。
-- 旧スクリプト（`extract_frames.ps1` ほか）は `legacy/` に保管しています。
+- 本ツールは単一スクリプト `frame150.ps1` で完結します（外部依存は ffmpeg、任意で pngquant のみ）。
