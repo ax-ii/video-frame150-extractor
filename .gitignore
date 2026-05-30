@@ -1,0 +1,29 @@
+# 旧スクリプト（公開しない）
+legacy/
+
+# 実行時の出力物（個人パス・動画内容を含む可能性があるため除外）
+*_frames/
+**/raw/
+**/final/
+_meta.json
+preview_compare.png
+preview.gif
+*.gif
+
+# 動画・画像ファイル
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.png
+*.jpg
+*.jpeg
+*.webp
+
+# OS / エディタ
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
