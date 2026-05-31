@@ -416,6 +416,13 @@ Write-Host ("  フレーム間隔  : {0} ms/枚" -f $frameIntervalMs)
 Write-Host ("  予測フレーム数: {0} 枚" -f $estFrameCount)
 Write-Host ("  補完モード    : {0}" -f $Interpolate)
 
+# 補完が起こりうる条件：抽出FPS > 元動画FPS（足りないフレームを埋める）
+$willInterpolate = ($srcFps -gt 0 -and $useFps -gt $srcFps)
+if ($willInterpolate) {
+    Write-Host ("  ⚠ 抽出FPS({0}) > 元動画FPS({1}) → 補完が発生します" -f $useFps, $srcFps) -ForegroundColor Yellow
+    Write-Host  "      none=同フレーム複製 / blend=ブレンド合成 / minterpolate=動き推定生成" -ForegroundColor Yellow
+}
+
 # ─── 比較画像 ─────────────────────────────────────────────────
 if (-not $NoCompare) {
     Write-Host "`n比較画像を生成中..." -ForegroundColor Cyan
@@ -454,6 +461,22 @@ if ($Force) {
     if (-not $choice) { Remove-Item $sampleTmp -ErrorAction SilentlyContinue; Write-Host "キャンセルしました。"; exit 0 }
 }
 Remove-Item $sampleTmp -ErrorAction SilentlyContinue
+
+# ─── 補完モード選択（補完が起こりうる & 未指定 & 対話時のみ） ──
+if ($willInterpolate -and -not $Force -and $Interpolate -eq "none") {
+    Write-Host "`n─── フレーム補完 ──────────────────────────────" -ForegroundColor Cyan
+    Write-Host "  抽出FPSが元動画を上回るため、不足フレームの埋め方を選べます:"
+    Write-Host "  [1] none          同じフレームを複製（高速・既定）"
+    Write-Host "  [2] blend         前後フレームをブレンド合成"
+    Write-Host "  [3] minterpolate  動き推定で中間フレーム生成（高品質・低速）"
+    $imap = @{ "1" = "none"; "2" = "blend"; "3" = "minterpolate" }
+    while ($true) {
+        $ians = Read-Host "選択 [1-3]"
+        if ($imap.ContainsKey($ians)) { $Interpolate = $imap[$ians]; break }
+        Write-Host "  無効な入力です。" -ForegroundColor Yellow
+    }
+    Write-Host ("  → 補完モード: {0}" -f $Interpolate) -ForegroundColor Green
+}
 
 # ─── GIF作成可否 ──────────────────────────────────────────────
 if ($Force -or $PSBoundParameters.ContainsKey("Gif")) {
