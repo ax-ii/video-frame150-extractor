@@ -195,7 +195,7 @@ function Select-FormatOption([array]$options) {
 }
 
 # ─── 比較画像生成 ─────────────────────────────────────────────
-function Build-CompareImage([string]$sample, [int]$count, [string]$outFile, [array]$configs, [double]$fps, [double]$intervalMs) {
+function Build-CompareImage([string]$sample, [int]$count, [string]$outFile, [array]$configs, [double]$fps, [double]$intervalMs, [double]$srcFps, [double]$srcIntervalMs) {
     try { Add-Type -AssemblyName System.Drawing -ErrorAction Stop }
     catch { Write-Warning "System.Drawingが使えないため比較画像をスキップします。"; return $false }
 
@@ -240,7 +240,8 @@ function Build-CompareImage([string]$sample, [int]$count, [string]$outFile, [arr
 
     $g.DrawString(("画質・容量 比較 （上限 {0} MB / 想定 {1} 枚）" -f $MaxSizeMB, $count),
                   $fontHead, $white, 12, 6)
-    $g.DrawString(("FPS: {0} fps  /  フレーム間隔: {1} ms/枚" -f $fps, $intervalMs),
+    $g.DrawString(("元動画: {0} fps / {1} ms/枚    抽出: {2} fps / {3} ms/枚" -f `
+                    $srcFps, $srcIntervalMs, $fps, $intervalMs),
                   $fontInfo, [System.Drawing.Brushes]::Gainsboro, 12, 36)
 
     for ($i = 0; $i -lt $n; $i++) {
@@ -371,6 +372,16 @@ $srcResolution = ffprobe -v error -select_streams v:0 `
     -show_entries stream=width,height -of csv=s=x:p=0 $InputVideo 2>$null
 if ($duration -le 0) { Write-Error "動画の長さを取得できませんでした。"; exit 1 }
 
+# 元動画のネイティブfps（r_frame_rate は "30000/1001" 等の分数）
+$srcFpsRaw = ffprobe -v error -select_streams v:0 `
+    -show_entries stream=r_frame_rate -of default=noprint_wrappers=1:nokey=1 $InputVideo 2>$null
+if ($srcFpsRaw -match '^(\d+)/(\d+)$' -and [double]$Matches[2] -ne 0) {
+    $srcFps = [math]::Round([double]$Matches[1] / [double]$Matches[2], 3)
+} elseif ($srcFpsRaw -match '^\d+(\.\d+)?$') {
+    $srcFps = [math]::Round([double]$srcFpsRaw, 3)
+} else { $srcFps = 0 }
+$srcIntervalMs = if ($srcFps -gt 0) { [math]::Round(1000 / $srcFps, 2) } else { 0 }
+
 if ([string]::IsNullOrWhiteSpace($FPS)) {
     $useFps    = [math]::Round($MaxFrames / $duration, 6)
     $fpsSource = "自動計算"
@@ -399,7 +410,8 @@ Write-Host ""
 Write-Host "─── 予測レポート ──────────────────────────────" -ForegroundColor Cyan
 Write-Host ("  動画長さ      : {0} 秒" -f [math]::Round($duration, 2))
 Write-Host ("  解像度        : {0}{1}" -f $srcResolution, $(if ($scaleFilter) { " → $outResolution (リサイズ)" } else { "" }))
-Write-Host ("  FPS           : {0} fps（{1}）" -f $useFps, $fpsSource)
+Write-Host ("  元動画FPS     : {0} fps / {1} ms/枚" -f $srcFps, $srcIntervalMs)
+Write-Host ("  抽出FPS       : {0} fps（{1}）" -f $useFps, $fpsSource)
 Write-Host ("  フレーム間隔  : {0} ms/枚" -f $frameIntervalMs)
 Write-Host ("  予測フレーム数: {0} 枚" -f $estFrameCount)
 Write-Host ("  補完モード    : {0}" -f $Interpolate)
@@ -416,7 +428,7 @@ if (-not $NoCompare) {
         @{ label = "無劣化 PNG"; quality = 100;                                fmt = "png"  }
     )
     New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
-    if (Build-CompareImage $sampleTmp $estFrameCount $CompareFile $configs $useFps $frameIntervalMs) {
+    if (Build-CompareImage $sampleTmp $estFrameCount $CompareFile $configs $useFps $frameIntervalMs $srcFps $srcIntervalMs) {
         Write-Host "  比較画像: $CompareFile" -ForegroundColor Green
         if (-not $Force) { Invoke-Item $CompareFile -ErrorAction SilentlyContinue }
     }
@@ -496,6 +508,8 @@ $meta = @{
     resolution_src    = $srcResolution
     resolution_out    = $outResolution
     scale             = $Scale
+    src_fps           = $srcFps
+    src_interval_ms   = $srcIntervalMs
     fps_used          = $useFps
     frame_interval_ms = $frameIntervalMs
     interpolate       = $Interpolate
