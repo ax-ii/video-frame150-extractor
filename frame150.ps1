@@ -221,8 +221,9 @@ function Build-CompareImage([string]$sample, [int]$count, [string]$outFile, [arr
     $first.Dispose()
     $cellH = [int]($cellW * $aspect)
 
+    $headH = 66
     $totalW = $cols * $cellW + ($cols + 1) * $pad
-    $totalH = $rows * ($cellH + $labelH) + ($rows + 1) * $pad + 40
+    $totalH = $rows * ($cellH + $labelH) + ($rows + 1) * $pad + $headH
 
     $bmp = New-Object System.Drawing.Bitmap($totalW, $totalH)
     $g = [System.Drawing.Graphics]::FromImage($bmp)
@@ -237,15 +238,16 @@ function Build-CompareImage([string]$sample, [int]$count, [string]$outFile, [arr
     $green = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(120, 230, 120))
     $amber = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(240, 190, 80))
 
-    $g.DrawString(("画質・容量 比較 （上限 {0} MB / 想定 {1} 枚 / {2} fps / {3} ms/枚）" -f `
-                    $MaxSizeMB, $count, $fps, $intervalMs),
-                  $fontHead, $white, 12, 8)
+    $g.DrawString(("画質・容量 比較 （上限 {0} MB / 想定 {1} 枚）" -f $MaxSizeMB, $count),
+                  $fontHead, $white, 12, 6)
+    $g.DrawString(("FPS: {0} fps  /  フレーム間隔: {1} ms/枚" -f $fps, $intervalMs),
+                  $fontInfo, [System.Drawing.Brushes]::Gainsboro, 12, 36)
 
     for ($i = 0; $i -lt $n; $i++) {
         $r = [int][math]::Floor($i / $cols)
         $col = $i % $cols
         $x = $pad + $col * ($cellW + $pad)
-        $y = 40 + $pad + $r * ($cellH + $labelH + $pad)
+        $y = $headH + $pad + $r * ($cellH + $labelH + $pad)
         if (Test-Path $items[$i].img) {
             $im = [System.Drawing.Image]::FromFile($items[$i].img)
             $g.DrawImage($im, $x, $y, $cellW, $cellH)
@@ -397,7 +399,8 @@ Write-Host ""
 Write-Host "─── 予測レポート ──────────────────────────────" -ForegroundColor Cyan
 Write-Host ("  動画長さ      : {0} 秒" -f [math]::Round($duration, 2))
 Write-Host ("  解像度        : {0}{1}" -f $srcResolution, $(if ($scaleFilter) { " → $outResolution (リサイズ)" } else { "" }))
-Write-Host ("  FPS           : {0} fps（{1}）/ {2} ms/枚" -f $useFps, $fpsSource, $frameIntervalMs)
+Write-Host ("  FPS           : {0} fps（{1}）" -f $useFps, $fpsSource)
+Write-Host ("  フレーム間隔  : {0} ms/枚" -f $frameIntervalMs)
 Write-Host ("  予測フレーム数: {0} 枚" -f $estFrameCount)
 Write-Host ("  補完モード    : {0}" -f $Interpolate)
 
